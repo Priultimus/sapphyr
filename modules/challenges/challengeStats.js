@@ -46,8 +46,12 @@ module.exports = class ChallengeStatsCommand extends global.utils.baseCommand {
 		const rankInfo = this.getUserRank(challengeData, user.id);
 		if (!rankInfo) return ctx.send("User not found!");
 		let rankText = `Currently ranked at #${rankInfo.user.rank}.`;
-		if (rankInfo.previousUser)
-			rankText += `\n${rankInfo.previousUser.count - rankInfo.user.count} challenges to catch up to ${this.client.users.get(rankInfo.previousUser.userId).tag}`;
+		if (rankInfo.previousUser) {
+			if (rankInfo.previousUser.count - rankInfo.user.count !== 0)
+				rankText += `\n${Math.abs(rankInfo.previousUser.count - rankInfo.user.count)} challenges to catch up to ${this.client.users.get(rankInfo.previousUser.userId).tag}`;
+			else if (rankInfo.previousUser.reward - rankInfo.user.reward !== 0)
+				rankText += `\n${Math.abs(rankInfo.previousUser.reward - rankInfo.user.reward)} ${sign} to catch up to ${this.client.users.get(rankInfo.previousUser.userId).tag}`;
+		}
 		return ctx.embed({
 			title: `Challenge Stats of ${user.tag}`,
 			description: rankText,
@@ -88,26 +92,30 @@ module.exports = class ChallengeStatsCommand extends global.utils.baseCommand {
 	getLeaderboard(challengeData, sortBy = "count") {
 		let leaderboard = [];
 		for (const [userId, challengeHistory] of Object.entries(challengeData.users)) {
-			leaderboard.push({
-				userId,
-				count: challengeHistory.length,
-				reward: sum(challengeHistory.map(entry => entry.challenge.reward))
-			});
+			if (this.client.users.has(userId))
+				leaderboard.push({
+					userId,
+					count: challengeHistory.length,
+					reward: sum(challengeHistory.map(entry => entry.challenge.reward))
+				});
 		}
-		if (sortBy === "reward")
-			leaderboard = leaderboard.sort((a, b) => b.reward - a.reward);
-		else
-			leaderboard = leaderboard.sort((a, b) => b.count - a.count);
+		leaderboard = leaderboard.sort((a, b) => b.reward - a.reward);
+		if (sortBy === "count")
+			leaderboard = leaderboard.sort((a, b) => b.count - a.count || b.reward - a.reward);
 		return leaderboard.map((element, index) => ({ ...element, rank: index + 1 }));
 	}
 
 	getUserRank(challengeData, userId) {
 		const leaderboard = this.getLeaderboard(challengeData, "count");
-		const index = leaderboard.findIndex(element => element.userId === userId);
+		let index = leaderboard.findIndex(element => element.userId === userId);
 		if (index < 0) return;
 		const data = { user: leaderboard[index] };
-		if (data.user.rank > 1)
-			data.previousUser = leaderboard[index - 1];
+		while (index > 0) {
+			index -= 1;
+			data.previousUser = leaderboard[index];
+			if (data.previousUser.count !== data.user.count || data.previousUser.reward !== data.user.reward)
+				break;
+		}
 		return data;
 	}
 };

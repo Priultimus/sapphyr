@@ -106,7 +106,7 @@ module.exports = class DenyCommand extends global.utils.baseCommand {
 								name: `Attachments sent by ${submissionMessage.author.tag}.`
 							},
 							title: "Message Content",
-							description: submissionMessage.cleanContent,
+							description: submissionMessage.cleanContent || "No message content.",
 							footer: { text: `User ID: ${submissionMessage.author.id} | Message ID: ${submissionMessage.id}` },
 							timestamp: submissionMessage.createdTimestamp
 						}),
@@ -120,12 +120,27 @@ module.exports = class DenyCommand extends global.utils.baseCommand {
 				}
 			}
 
-			if (attachmentLinks.length > 0)
-				attachmentField.push({
-					name: "Attachments",
-					value: attachmentLinks.map(({ name, size, url }) => `[${name} (${properRoundToTwo(size / (1024 * 1024))} MB)](${url})`).join("\n")
-				});
-
+			if (attachmentLinks.length > 0) {
+				let currentField = 0, totalText = "";
+				const links = attachmentLinks.map(({ name, size, url }) => `[${name.length >= 30 ? name.substring(0, 27) + "..." : name} (${properRoundToTwo(size / (1024 * 1024))} MB)](${url})`);
+				for (const link of links) {
+					if ((totalText + link + "\n").length <= 1024)
+						totalText += link + "\n";
+					if ((totalText + link + "\n").length > 1024) {
+						attachmentField.push({
+							name: `Attachments${currentField > 0 ? " (contd.)" : ""}`,
+							value: totalText
+						});
+						currentField += 1;
+						totalText = "";
+					}
+				}
+				if (totalText)
+					attachmentField.push({
+						name: `Attachments${currentField > 0 ? " (contd.)" : ""}`,
+						value: totalText
+					});
+			}
 		}
 
 		const fullMessage = ctx.args.messages.map(message => message.cleanContent).join("\n") || "No message content.";
@@ -141,7 +156,7 @@ module.exports = class DenyCommand extends global.utils.baseCommand {
 				embed: new RichEmbed({
 					author: { name: `${ctx.args.messages[0].author.tag}'s submission was denied.` },
 					title: "Message Content",
-					description: fullMessage,
+					description: fullMessage || "No message content.",
 					thumbnail: { url: ctx.args.messages[0].author.displayAvatarURL },
 					fields: [
 						{
@@ -167,8 +182,8 @@ module.exports = class DenyCommand extends global.utils.baseCommand {
 				embed: new RichEmbed({
 					author: { name: "Your submission was denied." },
 					title: "Message Content",
-					description: fullMessage,
-					thumbnail: { url: ctx.args.messages[0].author.displayAvatarURL },
+					description: fullMessage || "No message content.",
+					thumbnail: { url: ctx.user.displayAvatarURL },
 					fields: [
 						{
 							name: `Denied by ${ctx.user.tag} (${ctx.user.id}).`,
@@ -189,6 +204,13 @@ module.exports = class DenyCommand extends global.utils.baseCommand {
 		catch (error) {
 			ctx.selfDestruct("Unable to DM user, ignoring.");
 		}
+
+		const approverStats = await ctx.db.get("approverStats") || await ctx.db.set("approverStats", {});
+		if (!Array.isArray(approverStats[ctx.user.id]))
+			approverStats[ctx.user.id] = [];
+		approverStats[ctx.user.id].push({ type: "denial", timestamp });
+		await ctx.db.set("approverStats", approverStats);
+
 		await ctx.message.delete();
 		await Promise.all(ctx.args.messages.map(message => message.delete()));
 		this.uncache(ctx.args.messages, ctx.guild.id);
