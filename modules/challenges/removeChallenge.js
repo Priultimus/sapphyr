@@ -10,6 +10,7 @@ module.exports = class RemoveChallenge extends global.utils.baseCommand {
 			group: "challenges",
 			memberName: "removechallenge",
 			aliases: ["rch"],
+			userPermissions: ["MANAGE_ROLES"]
 			clientPermissions: ["SEND_MESSAGES", "EMBED_LINKS"],
 			args: [
 				{
@@ -28,14 +29,6 @@ module.exports = class RemoveChallenge extends global.utils.baseCommand {
 
 	async task(ctx) {
 		const approverRole = await ctx.db.get("approverRole") || await ctx.db.set("approverRole", "");
-		if (!approverRole)
-			return ctx.send(`Approver role not specified. Please specify an approver role using ${ctx.prefix}approverRole`);
-		if (!ctx.guild.roles.has(approverRole)) {
-			await ctx.db.set("approverRole", "");
-			return ctx.send("Approver role not found.");
-		}
-		if (!ctx.member.roles.has(approverRole))
-			return ctx.send(`You need the ${ctx.guild.roles.get(approverRole).name} role to use this command.`);
 
 		if (ctx.args.user.id === ctx.user.id)
 			return ctx.send("You cannot remove your own challenges.");
