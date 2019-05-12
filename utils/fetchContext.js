@@ -10,7 +10,7 @@ const timedEvents = ["minute", "fiveMinutes", "fifteenMinutes", "halfAnHour", "h
 
 const camelCase = data => data.replace(/(_\w)/g, text => text[1].toUpperCase());
 const camelCaseKeys = obj => {
-	var newObj = {};
+	const newObj = {};
 	for (const data in obj) {
 		if (obj.hasOwnProperty(data))
 			newObj[camelCase(data)] = obj[data];
@@ -23,7 +23,6 @@ const fetchContext = async function (client, event, args) {
 	await attachDatahandler(client, context);
 	if (timedEvents.includes(event)) {
 		context.currentTime = new Date(Date.now());
-		return context;
 	}
 	if (event === "channelCreate" || event === "channelDelete") {
 		[context.channel] = args;
@@ -216,10 +215,8 @@ const attachGuildDatahandler = async context => {
 			context.nadekoConnector = new nadekoConnector(nc.address, nc.password);
 		else {
 			const ncdb = await context.db.get("nadekoDbConnector");
-			if (typeof ncdb === "object" && ncdb.enabled) {
-				context.nadekoConnector = new nadekoDbConnector(ncdb.databasePath, ncdb.credentialsPath);
-				context.nadekoConnector.initialize();
-			}
+			if (typeof ncdb === "object" && ncdb.enabled)
+				context.nadekoConnector = new nadekoDbConnector(ncdb.databasePath, ncdb.credentialsPath).initialize();
 		}
 	}
 };
@@ -240,8 +237,29 @@ const attachExtras = async context => {
 	if (context.channel) {
 		context.selfDestruct = (data, seconds = 10) => context.channel.send(data).then(msg => msg.delete(seconds * 1000));
 	}
+	context.prefix = context.guild && context.guild.commandPrefix ? context.guild.commandPrefix : context.client.commandPrefix;
 	if (context.arguments)
 		context.args = context.arguments;
+
+	if (!context.guild) {
+		context.getDb = guild => {
+			const id = typeof guild === "string" ? guild : guild.id;
+			return new guildDatahandler(context.client.datahandler, id);
+		};
+		context.getNadekoConnector = async guild => {
+			const id = typeof guild === "string" ? guild : guild.id;
+			const db = new guildDatahandler(context.client.datahandler, id);
+			const nc = await db.get("nadekoconnector");
+			if (typeof nc === "object" && nc.enabled)
+				return new nadekoConnector(nc.address, nc.password);
+			else {
+				const ncdb = await context.db.get("nadekoDbConnector");
+				if (typeof ncdb === "object" && ncdb.enabled)
+					return new nadekoDbConnector(ncdb.databasePath, ncdb.credentialsPath).initialize();
+			}
+			return;
+		};
+	}
 };
 
 module.exports = fetchContext;
