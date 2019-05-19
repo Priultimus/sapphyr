@@ -135,6 +135,7 @@ class Connector {
 			statements.forEach(statement => this.db.pragma(statement));
 		}
 		catch (error) {
+			console.error(error);
 			throw new Error("Database could not be initialized.");
 		}
 		this._init = true;
