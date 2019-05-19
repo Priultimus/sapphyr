@@ -10,7 +10,7 @@ module.exports = class RemoveChallenge extends global.utils.baseCommand {
 			group: "challenges",
 			memberName: "removechallenge",
 			aliases: ["rch"],
-			userPermissions: ["MANAGE_ROLES"]
+			userPermissions: ["MANAGE_ROLES"],
 			clientPermissions: ["SEND_MESSAGES", "EMBED_LINKS"],
 			args: [
 				{
